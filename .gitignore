@@ -1,0 +1,4 @@
+   *.db
+   app.log
+   __pycache__/
+   .venv/
