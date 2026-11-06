@@ -1,4 +1,38 @@
+<<<<<<< HEAD
 *.db
 app.log
 __pycache__/
 .venv/
+=======
+# gitignore 
+__pycache__/
+*.pyc
+*.pyo
+
+
+.venv/
+venv/
+
+
+.vscode/
+.idea/
+
+
+*.db
+*.sqlite
+*.sqlite3
+
+
+app.log
+*.log
+
+
+Thumbs.db
+desktop.ini
+.DS_Store
+
+
+
+
+
+>>>>>>> origin/main
