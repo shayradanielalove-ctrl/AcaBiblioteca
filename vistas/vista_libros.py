@@ -1,14 +1,3 @@
-"""
-Vista (capa de presentación) del módulo de Libros.
-
-Esta clase SOLO se encarga de mostrar la pantalla y de recoger lo que
-escribe el usuario. No habla con la base de datos: cuando el usuario
-presiona un botón, le avisa al CONTROLADOR, y el controlador decide qué hacer.
-
-Para probarla sola (desde la carpeta raíz del proyecto):
-    py -m vistas.vista_libros
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 
