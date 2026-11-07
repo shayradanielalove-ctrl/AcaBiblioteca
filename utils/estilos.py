@@ -1,28 +1,18 @@
-"""
-Estilos visuales del Sistema de Gestión de Biblioteca.
-
-Todas las ventanas deben tomar sus colores y fuentes de este archivo.
-Así, si se quiere cambiar el diseño, se cambia aquí una sola vez.
-
-Uso:
-    from utils import estilos
-    ctk.CTkLabel(..., text_color=estilos.COLOR_TEXTO, font=estilos.FUENTE_TITULO)
-"""
 
 # ==============================
 # COLORES GENERALES
 # ==============================
-COLOR_FONDO = "#eedad4"           # Fondo de toda la ventana
-COLOR_PANEL = "#f3e7e4"           # Fondo de los paneles (formulario y tabla)
-COLOR_BARRA = "#f7efed"           # Fondo de la barra de búsqueda
-COLOR_TEXTO = "#784870"           # Títulos y etiquetas (morado)
-COLOR_TEXTO_SECUNDARIO = "#5e3857"  # Texto de ayuda dentro de las cajas
+COLOR_FONDO = "#eedad4"           
+COLOR_PANEL = "#f3e7e4"           
+COLOR_BARRA = "#f7efed"           
+COLOR_TEXTO = "#784870"           
+COLOR_TEXTO_SECUNDARIO = "#5e3857"  
 
 # ==============================
 # CAJAS DE TEXTO Y LISTAS
 # ==============================
-COLOR_CAMPO = "#bb99ac"           # Fondo de las cajas de texto (lila)
-COLOR_CAMPO_TEXTO = "#4a2c45"     # Texto que escribe el usuario
+COLOR_CAMPO = "#bb99ac"           
+COLOR_CAMPO_TEXTO = "#4a2c45"     
 COLOR_CAMPO_BORDE = "#bb99ac"
 
 # ==============================
