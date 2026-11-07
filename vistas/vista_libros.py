@@ -402,21 +402,43 @@ class VistaLibros(ctk.CTkFrame):
 # =====================================================
 if __name__ == "__main__":
 
+    from datos.conexion import RUTA_BD, conexion
+    from modelos.autor import Autor
+    from modelos.editorial import Editorial
+    from modelos.libro import Libro
+
+    def leer_base_de_datos():
+        """
+        Lee autores, editoriales y libros de AcaBiblioteca.db (SOLO lectura).
+        Si el archivo .db no existe, devuelve listas vacías: no se crea uno vacío.
+        """
+        if not RUTA_BD.exists():
+            print(f"Aviso: no existe {RUTA_BD}. La tabla se muestra vacía.")
+            return [], [], []
+        with conexion() as conn:
+            autores = [Autor.desde_fila(f).a_opcion() for f in conn.execute(
+                "SELECT IdAutor, Nombre, Apellido FROM Autores ORDER BY IdAutor")]
+            editoriales = [Editorial.desde_fila(f).a_opcion() for f in conn.execute(
+                "SELECT Ideditorial, Nombre FROM Editoriales ORDER BY Ideditorial")]
+            libros = [Libro.desde_fila(f).a_diccionario() for f in conn.execute(
+                """SELECT l.ISBN, l.Titulo, l.IdAutor, l.IdEditorial, l.Categoria, l."Año", l.Existencias,
+                          a.Nombre || ' ' || a.Apellido AS Autor, e.Nombre AS Editorial
+                   FROM Libros l
+                   JOIN Autores a ON a.IdAutor = l.IdAutor
+                   JOIN Editoriales e ON e.Ideditorial = l.IdEditorial
+                   ORDER BY l.Titulo""")]
+        return autores, editoriales, libros
+
     class ControladorDePrueba:
-        """Controlador falso que guarda en una lista (en memoria) para probar la vista."""
+        """
+        Controlador de prueba: muestra lo que hay en la base de datos.
+        Guardar y Eliminar solo cambian la lista en memoria (NO escriben en la BD);
+        eso lo hará el controlador real del módulo de Libros.
+        """
 
         def __init__(self, vista):
             self.vista = vista
-            self.autores = [(1, "Gabriel García Márquez"), (4, "George Orwell"), (5, "Miguel de Cervantes")]
-            self.editoriales = [(1, "Planeta"), (3, "Penguin Random House")]
-            self.libros = [
-                {"ISBN": "9780307474728", "Titulo": "Cien años de soledad", "IdAutor": 1, "IdEditorial": 1,
-                 "Categoria": "Novela", "Anio": 1967, "Existencias": 5},
-                {"ISBN": "9780451524935", "Titulo": "1984", "IdAutor": 4, "IdEditorial": 3,
-                 "Categoria": "Distopía", "Anio": 1949, "Existencias": 4},
-                {"ISBN": "9780060934347", "Titulo": "Don Quijote de la Mancha", "IdAutor": 5, "IdEditorial": 1,
-                 "Categoria": "Novela", "Anio": 1605, "Existencias": 3},
-            ]
+            self.autores, self.editoriales, self.libros = leer_base_de_datos()
             self.vista.cargar_listas(self.autores, self.editoriales)
             self.refrescar()
 
