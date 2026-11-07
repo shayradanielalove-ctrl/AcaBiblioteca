@@ -1,4 +1,4 @@
-# gitignore 
+# gitignore
 __pycache__/
 *.pyc
 *.pyo
@@ -24,8 +24,3 @@ app.log
 Thumbs.db
 desktop.ini
 .DS_Store
-
-
-
-
-
