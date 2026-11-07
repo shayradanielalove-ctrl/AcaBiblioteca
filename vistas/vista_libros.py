@@ -392,9 +392,6 @@ class VistaLibros(ctk.CTkFrame):
 if __name__ == "__main__":
 
     from datos.conexion import RUTA_BD, conexion
-    from modelos.autor import Autor
-    from modelos.editorial import Editorial
-    from modelos.libro import Libro
 
     def leer_base_de_datos():
         """
@@ -405,12 +402,14 @@ if __name__ == "__main__":
             print(f"Aviso: no existe {RUTA_BD}. La tabla se muestra vacía.")
             return [], [], []
         with conexion() as conn:
-            autores = [Autor.desde_fila(f).a_opcion() for f in conn.execute(
-                "SELECT IdAutor, Nombre, Apellido FROM Autores ORDER BY IdAutor")]
-            editoriales = [Editorial.desde_fila(f).a_opcion() for f in conn.execute(
+            autores = [(f["IdAutor"], f["NombreCompleto"]) for f in conn.execute(
+                "SELECT IdAutor, Nombre || ' ' || Apellido AS NombreCompleto FROM Autores ORDER BY IdAutor")]
+            editoriales = [(f["Ideditorial"], f["Nombre"]) for f in conn.execute(
                 "SELECT Ideditorial, Nombre FROM Editoriales ORDER BY Ideditorial")]
-            libros = [Libro.desde_fila(f).a_diccionario() for f in conn.execute(
-                """SELECT l.ISBN, l.Titulo, l.IdAutor, l.IdEditorial, l.Categoria, l."Año", l.Existencias,
+            # Los alias (AS ...) dejan las columnas con los nombres que usa la vista
+            libros = [dict(f) for f in conn.execute(
+                """SELECT l.ISBN, l.Titulo, l.IdAutor, l.IdEditorial, l.Categoria,
+                          IFNULL(l."Año", '') AS Anio, l.Existencias,
                           a.Nombre || ' ' || a.Apellido AS Autor, e.Nombre AS Editorial
                    FROM Libros l
                    JOIN Autores a ON a.IdAutor = l.IdAutor
