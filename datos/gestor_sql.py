@@ -1,5 +1,5 @@
 import sqlite3
-from conexion import obtener_conexion
+from datos.conexion import obtener_conexion
 from pathlib import Path
 from pendulum import date
 
@@ -81,6 +81,27 @@ class GestorSQL:
             self.conn.rollback()
             self.ultimo_error = str(e)
             print(f"Error al editar: {e}")
+            return False
+        
+    def transaccion(self, consultas):
+        try:
+            for consulta in consultas:
+                sql, datos, comprobar = consulta
+
+                self.cur.execute(sql, datos)
+
+                if comprobar and self.cur.rowcount != 1:
+                    raise sqlite3.IntegrityError(
+                        "La operación no modificó el registro esperado."
+                    )
+
+            self.conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            self.conn.rollback()
+            self.ultimo_error = str(e)
+            print(f"Error en transacción: {e}")
             return False
 
 

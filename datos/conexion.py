@@ -2,7 +2,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-RUTA_BD = Path(__file__).resolve().parent / "AcaBiblioteca.db"
+RUTA_BD = Path(__file__).resolve().parent.parent / "AcaBiblioteca.db"
 
 
 def obtener_conexion():

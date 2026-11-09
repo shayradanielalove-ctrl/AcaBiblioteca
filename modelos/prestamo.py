@@ -113,7 +113,7 @@ class Prestamo:
     def a_diccionario(self):
         return {
             "IdPrestamo": self.id_prestamo,
-            "IdUsuario": self.id_usuario,
+            "IdUsuarios": self.id_usuario,
             "ISBN": self.isbn,
             "FechaPrestamo": self.fecha_prestamo.isoformat(),
             "FechaDevolucion": self.fecha_devolucion.isoformat() if self.fecha_devolucion else "",
