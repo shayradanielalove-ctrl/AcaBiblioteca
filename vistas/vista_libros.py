@@ -3,11 +3,18 @@ from tkinter import ttk, messagebox
 
 import customtkinter as ctk
 
+from modelos.libro import Libro
 from utils import estilos
 
 
 class VistaLibros(ctk.CTkFrame):
-    """Pantalla de Gestión de Libros (formulario a la izquierda, tabla a la derecha)."""
+    """
+    Pantalla de Gestión de Libros (formulario a la izquierda, tabla a la derecha).
+
+    Usa los controladores del grupo (controladores/controladores.py):
+      - ControladorLibros: guardar, actualizar, eliminar, obtener_uno, obtener_todo
+      - ControladorAutores y ControladorEditoriales: obtener_todo (para las listas)
+    """
 
     # Columnas de la tabla: (clave del diccionario, texto del encabezado, ancho)
     COLUMNAS = [
@@ -20,9 +27,11 @@ class VistaLibros(ctk.CTkFrame):
         ("Existencias", "Existencias", 100),
     ]
 
-    def __init__(self, master, controlador=None):
+    def __init__(self, master, controlador_libros=None, controlador_autores=None, controlador_editoriales=None):
         super().__init__(master, fg_color=estilos.COLOR_FONDO, corner_radius=0)
-        self.controlador = controlador
+        self.controlador_libros = controlador_libros
+        self.controlador_autores = controlador_autores
+        self.controlador_editoriales = controlador_editoriales
 
         # Diccionarios para traducir el texto de las listas a su Id
         # Ejemplo: {"1 - Gabriel García Márquez": 1}
@@ -39,6 +48,10 @@ class VistaLibros(ctk.CTkFrame):
         self._crear_encabezado()
         self._crear_panel_izquierdo()
         self._crear_tabla()
+
+        # Si ya llegaron los controladores, se cargan los datos de la base
+        if self.controlador_libros is not None:
+            self.refrescar()
 
     # =====================================================
     # CONSTRUCCIÓN DE LA PANTALLA
@@ -250,11 +263,42 @@ class VistaLibros(ctk.CTkFrame):
         )
 
     # =====================================================
-    # MÉTODOS QUE USA EL CONTROLADOR
+    # CONEXIÓN CON LOS CONTROLADORES
     # =====================================================
 
-    def set_controlador(self, controlador):
-        self.controlador = controlador
+    def conectar(self, controlador_libros, controlador_autores, controlador_editoriales):
+        """Conecta los controladores después de crear la vista y carga los datos."""
+        self.controlador_libros = controlador_libros
+        self.controlador_autores = controlador_autores
+        self.controlador_editoriales = controlador_editoriales
+        self.refrescar()
+
+    def refrescar(self):
+        """Vuelve a leer autores, editoriales y libros desde la base y los muestra."""
+        autores = self._llamar(self.controlador_autores.obtener_todo) or []
+        editoriales = self._llamar(self.controlador_editoriales.obtener_todo) or []
+        libros = self._llamar(self.controlador_libros.obtener_todo) or []
+
+        # Los controladores devuelven objetos (Autor, Editorial, Libro).
+        # a_opcion() los convierte en la tupla (id, nombre) que usan las listas.
+        opciones_autores = [autor.a_opcion() for autor in autores]
+        opciones_editoriales = [editorial.a_opcion() for editorial in editoriales]
+        self.cargar_listas(opciones_autores, opciones_editoriales)
+
+        # La tabla Libros solo guarda los Id; aquí se buscan los nombres para mostrarlos
+        nombre_autor = dict(opciones_autores)
+        nombre_editorial = dict(opciones_editoriales)
+        filas = []
+        for libro in sorted(libros, key=lambda l: l.titulo.lower()):
+            fila = libro.a_diccionario()
+            fila["Autor"] = fila["Autor"] or nombre_autor.get(libro.id_autor, "")
+            fila["Editorial"] = fila["Editorial"] or nombre_editorial.get(libro.id_editorial, "")
+            filas.append(fila)
+        self.cargar_tabla(filas)
+
+    # =====================================================
+    # MÉTODOS PARA MOSTRAR DATOS
+    # =====================================================
 
     def cargar_listas(self, autores, editoriales):
         """
@@ -327,24 +371,66 @@ class VistaLibros(ctk.CTkFrame):
     # =====================================================
 
     def _al_guardar(self):
-        if self._hay_controlador():
-            self.controlador.guardar_libro(self.obtener_datos())
+        if not self._hay_controlador():
+            return
+
+        # 1) El modelo Libro valida los datos (campos obligatorios, números, ISBN...)
+        try:
+            libro = Libro.desde_formulario(self.obtener_datos())
+        except ValueError as error:
+            self.mostrar_error(str(error))
+            return
+
+        # 2) Si el ISBN ya existe se ACTUALIZA; si no, se REGISTRA uno nuevo
+        existente = self._llamar(self.controlador_libros.obtener_uno, "ISBN", libro.isbn)
+        if existente is not None:
+            if not self.confirmar(f"Ya existe un libro con ISBN {libro.isbn}. ¿Actualizar sus datos?"):
+                return
+            guardado = self._llamar(self.controlador_libros.actualizar, libro, libro.isbn)
+        else:
+            guardado = self._llamar(self.controlador_libros.guardar, libro)
+
+        # 3) Se informa el resultado
+        if guardado:
+            self.refrescar()
+            self.limpiar()
+            self.mostrar_mensaje("Libro guardado correctamente.")
+        elif guardado is False:
+            self.mostrar_error("No se pudo guardar el libro. Revisa los datos e inténtalo de nuevo.")
 
     def _al_eliminar(self):
-        isbn = self.campos["isbn"].get().strip()
+        if not self._hay_controlador():
+            return
+        isbn = self.campos["isbn"].get().strip().replace("-", "")
         if not isbn:
             self.mostrar_error("Selecciona un libro de la tabla o escribe su ISBN.")
             return
-        if self._hay_controlador() and self.confirmar(f"¿Eliminar el libro con ISBN {isbn}?"):
-            self.controlador.eliminar_libro(isbn)
+        if self._llamar(self.controlador_libros.obtener_uno, "ISBN", isbn) is None:
+            self.mostrar_error(f"No existe un libro con ISBN {isbn}.")
+            return
+        if not self.confirmar(f"¿Eliminar el libro con ISBN {isbn}?"):
+            return
+
+        if self._llamar(self.controlador_libros.eliminar, isbn):
+            self.refrescar()
+            self.limpiar()
+            self.mostrar_mensaje("Libro eliminado.")
+        else:
+            # Lo más común: el libro tiene préstamos y la clave foránea no deja borrarlo
+            self.mostrar_error("No se pudo eliminar el libro. Puede que tenga préstamos registrados.")
 
     def _al_buscar(self):
-        isbn = self.entrada_buscar.get().strip()
+        if not self._hay_controlador():
+            return
+        isbn = self.entrada_buscar.get().strip().replace("-", "")
         if not isbn:
             self.mostrar_error("Escribe un ISBN para buscar.")
             return
-        if self._hay_controlador():
-            self.controlador.buscar_libro(isbn)
+        libro = self._llamar(self.controlador_libros.obtener_uno, "ISBN", isbn)
+        if libro is None:
+            self.mostrar_error(f"No existe un libro con ISBN {isbn}.")
+            return
+        self.llenar_formulario(libro.a_diccionario())
 
     def _al_seleccionar_fila(self, evento):
         seleccion = self.tabla.selection()
@@ -357,6 +443,18 @@ class VistaLibros(ctk.CTkFrame):
 
     # ---------- Ayudantes internos ----------
 
+    def _llamar(self, funcion, *argumentos):
+        """
+        Llama a un método del controlador. Si ocurre un error inesperado
+        (por ejemplo, la base de datos no responde), muestra un mensaje
+        en vez de cerrar el programa, y devuelve None.
+        """
+        try:
+            return funcion(*argumentos)
+        except Exception as error:
+            self.mostrar_error(f"Ocurrió un error con la base de datos:\n{error}")
+            return None
+
     def _vaciar_campos(self):
         for widget in self.campos.values():
             if isinstance(widget, ctk.CTkComboBox):
@@ -365,7 +463,7 @@ class VistaLibros(ctk.CTkFrame):
                 widget.delete(0, tk.END)
 
     def _hay_controlador(self):
-        if self.controlador is None:
+        if self.controlador_libros is None:
             self.mostrar_error("La vista no tiene controlador conectado.")
             return False
         return True
@@ -387,81 +485,11 @@ class VistaLibros(ctk.CTkFrame):
 
 
 # =====================================================
-# PRUEBA: ejecutar este archivo solo, con datos de ejemplo
+# PRUEBA: abrir solo esta ventana, conectada a la base de datos real
+# (desde la raíz del proyecto: py -m vistas.vista_libros)
 # =====================================================
 if __name__ == "__main__":
-
-    from datos.conexion import RUTA_BD, conexion
-
-    def leer_base_de_datos():
-        """
-        Lee autores, editoriales y libros de AcaBiblioteca.db (SOLO lectura).
-        Si el archivo .db no existe, devuelve listas vacías: no se crea uno vacío.
-        """
-        if not RUTA_BD.exists():
-            print(f"Aviso: no existe {RUTA_BD}. La tabla se muestra vacía.")
-            return [], [], []
-        with conexion() as conn:
-            autores = [(f["IdAutor"], f["NombreCompleto"]) for f in conn.execute(
-                "SELECT IdAutor, Nombre || ' ' || Apellido AS NombreCompleto FROM Autores ORDER BY IdAutor")]
-            editoriales = [(f["Ideditorial"], f["Nombre"]) for f in conn.execute(
-                "SELECT Ideditorial, Nombre FROM Editoriales ORDER BY Ideditorial")]
-            # Los alias (AS ...) dejan las columnas con los nombres que usa la vista
-            libros = [dict(f) for f in conn.execute(
-                """SELECT l.ISBN, l.Titulo, l.IdAutor, l.IdEditorial, l.Categoria,
-                          IFNULL(l."Año", '') AS Anio, l.Existencias,
-                          a.Nombre || ' ' || a.Apellido AS Autor, e.Nombre AS Editorial
-                   FROM Libros l
-                   JOIN Autores a ON a.IdAutor = l.IdAutor
-                   JOIN Editoriales e ON e.Ideditorial = l.IdEditorial
-                   ORDER BY l.Titulo""")]
-        return autores, editoriales, libros
-
-    class ControladorDePrueba:
-        """
-        Controlador de prueba: muestra lo que hay en la base de datos.
-        Guardar y Eliminar solo cambian la lista en memoria (NO escriben en la BD);
-        eso lo hará el controlador real del módulo de Libros.
-        """
-
-        def __init__(self, vista):
-            self.vista = vista
-            self.autores, self.editoriales, self.libros = leer_base_de_datos()
-            self.vista.cargar_listas(self.autores, self.editoriales)
-            self.refrescar()
-
-        def refrescar(self):
-            nombres_autor = dict(self.autores)
-            nombres_editorial = dict(self.editoriales)
-            filas = []
-            for libro in self.libros:
-                fila = dict(libro)
-                fila["Autor"] = nombres_autor.get(libro["IdAutor"], "")
-                fila["Editorial"] = nombres_editorial.get(libro["IdEditorial"], "")
-                filas.append(fila)
-            self.vista.cargar_tabla(filas)
-
-        def guardar_libro(self, datos):
-            if not datos["ISBN"] or not datos["Titulo"] or datos["IdAutor"] is None or datos["IdEditorial"] is None:
-                self.vista.mostrar_error("ISBN, título, autor y editorial son obligatorios.")
-                return
-            self.libros = [l for l in self.libros if l["ISBN"] != datos["ISBN"]]
-            self.libros.append(datos)
-            self.refrescar()
-            self.vista.limpiar()
-            self.vista.mostrar_mensaje("Libro guardado (solo en memoria, es una prueba).")
-
-        def eliminar_libro(self, isbn):
-            self.libros = [l for l in self.libros if l["ISBN"] != isbn]
-            self.refrescar()
-            self.vista.limpiar()
-
-        def buscar_libro(self, isbn):
-            for libro in self.libros:
-                if libro["ISBN"] == isbn:
-                    self.vista.llenar_formulario(libro)
-                    return
-            self.vista.mostrar_error(f"No existe un libro con ISBN {isbn}.")
+    from datos.conexion import RUTA_BD
 
     ctk.set_appearance_mode("light")
     ventana = ctk.CTk()
@@ -471,6 +499,21 @@ if __name__ == "__main__":
 
     vista = VistaLibros(ventana)
     vista.pack(fill="both", expand=True)
-    vista.set_controlador(ControladorDePrueba(vista))
+
+    if RUTA_BD.exists():
+        # Misma conexión entre capas que usa main.py: gestor -> servicio -> controladores
+        from controladores.controladores import ControladorAutores, ControladorEditoriales, ControladorLibros
+        from datos.gestor_sql import GestorSQL
+        from servicios.service import Service
+
+        servicio = Service(GestorSQL())
+        vista.conectar(
+            ControladorLibros(servicio),
+            ControladorAutores(servicio),
+            ControladorEditoriales(servicio),
+        )
+    else:
+        # No se crea una base vacía: se avisa y la ventana se abre sin datos
+        print(f"Aviso: no existe {RUTA_BD}. Crea la base desde database/schema_y_datos.sql.")
 
     ventana.mainloop()
