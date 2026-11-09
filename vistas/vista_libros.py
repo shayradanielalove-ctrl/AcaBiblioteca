@@ -1,10 +1,16 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from pathlib import Path
+
 import customtkinter as ctk
+from PIL import Image
 
 from modelos.libro import Libro
 from utils import estilos
+
+# Ruta del logo: carpeta recursos/ en la raíz del proyecto
+RUTA_LOGO = Path(__file__).resolve().parent.parent / "recursos" / "logo.png"
 
 
 class VistaLibros(ctk.CTkFrame):
@@ -58,16 +64,25 @@ class VistaLibros(ctk.CTkFrame):
     # =====================================================
 
     def _crear_encabezado(self):
-        """Franja superior con el título 'Gestión de Libros'."""
+        """Franja superior con el logo de Tech Aca y el título 'Gestión de Libros'."""
         encabezado = ctk.CTkFrame(self, fg_color=estilos.COLOR_FONDO, corner_radius=0)
         encabezado.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(10, 5))
+
+        # El logo está en recursos/logo.png (con fondo transparente).
+        # Si no se encuentra, la pantalla se abre igual, solo sin logo.
+        if RUTA_LOGO.exists():
+            imagen = Image.open(RUTA_LOGO)
+            alto = 90
+            ancho = round(imagen.width * alto / imagen.height)  # se mantiene la proporción
+            self._logo = ctk.CTkImage(light_image=imagen, size=(ancho, alto))
+            ctk.CTkLabel(encabezado, image=self._logo, text="").pack(side="left", padx=(20, 15))
 
         ctk.CTkLabel(
             encabezado,
             text="Gestión de Libros",
             font=estilos.FUENTE_TITULO,
             text_color=estilos.COLOR_TEXTO,
-        ).pack(pady=5)
+        ).pack(side="left", pady=5)
 
     def _crear_panel_izquierdo(self):
         """Barra de búsqueda + formulario + botones."""
