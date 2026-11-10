@@ -59,7 +59,7 @@ class Usuario(Persona):
     def a_diccionario(self):
         datos = super().a_diccionario()
         datos.update({
-            "IdUsuario": self.id_usuario,
+            "IdUsuarios": self.id_usuario,
             "Documento": self.documento,
             "Telefono": self.telefono,
             "Correo": self.correo,

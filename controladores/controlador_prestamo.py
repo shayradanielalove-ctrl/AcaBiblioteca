@@ -1,6 +1,9 @@
+
 from servicios.prestamo_service import PrestamoService
 
+
 class ControladorPrestamos:
+
     def __init__(self, servicio):
         self.servicio = servicio
 
@@ -12,6 +15,6 @@ class ControladorPrestamos:
 
     def obtener_todo(self):
         return self.servicio.listar_todo()
-    
+
     def obtener_uno(self, codigo):
         return self.servicio.listar_uno(codigo)
