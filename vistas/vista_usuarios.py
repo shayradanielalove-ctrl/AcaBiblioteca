@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -45,6 +44,7 @@ class VistaUsuarios(ctk.CTkFrame):
 
         self.controlador_usuarios = controlador_usuarios
         self.campos = {}
+        self.id_actual = None
 
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
@@ -236,7 +236,15 @@ class VistaUsuarios(ctk.CTkFrame):
             estilos.COLOR_BOTON_PRINCIPAL,
             estilos.COLOR_BOTON_PRINCIPAL_HOVER,
             self._al_guardar
-        ).grid(row=0, column=0, padx=5)
+        ).grid(row=0, column=0, padx=5, pady=5)
+
+        self._nuevo_boton(
+            botones,
+            "Actualizar",
+            estilos.COLOR_BOTON_PRINCIPAL,
+            estilos.COLOR_BOTON_PRINCIPAL_HOVER,
+            self._al_actualizar
+        ).grid(row=0, column=1, padx=5, pady=5)
 
         self._nuevo_boton(
             botones,
@@ -244,7 +252,7 @@ class VistaUsuarios(ctk.CTkFrame):
             estilos.COLOR_BOTON_PELIGRO,
             estilos.COLOR_BOTON_PELIGRO_HOVER,
             self._al_eliminar
-        ).grid(row=0, column=1, padx=5)
+        ).grid(row=1, column=0, padx=5, pady=5)
 
         self._nuevo_boton(
             botones,
@@ -252,7 +260,7 @@ class VistaUsuarios(ctk.CTkFrame):
             estilos.COLOR_BOTON_SECUNDARIO,
             estilos.COLOR_BOTON_SECUNDARIO_HOVER,
             self.limpiar
-        ).grid(row=0, column=2, padx=5)
+        ).grid(row=1, column=1, padx=5, pady=5)
 
     def _crear_tabla(self):
         """Tabla Treeview con los usuarios registrados."""
@@ -487,6 +495,9 @@ class VistaUsuarios(ctk.CTkFrame):
 
         self._vaciar_campos()
 
+        # Conservamos el ID del usuario que se está editando.
+        self.id_actual = usuario.id_usuario
+
         self._escribir(
             self.campos["nombre"],
             usuario.nombre
@@ -517,6 +528,9 @@ class VistaUsuarios(ctk.CTkFrame):
 
         self._vaciar_campos()
 
+        # Ya no hay ningún usuario seleccionado.
+        self.id_actual = None
+
         self.entrada_buscar.delete(0, tk.END)
 
         if self.tabla.selection():
@@ -540,6 +554,13 @@ class VistaUsuarios(ctk.CTkFrame):
     def _al_guardar(self):
 
         if not self._hay_controlador():
+            return
+
+        # No permitimos guardar si ya hay un usuario seleccionado.
+        if self.id_actual is not None:
+            self.mostrar_error(
+                "Hay un usuario seleccionado. Usa Actualizar o Limpiar antes de registrar otro."
+            )
             return
 
         try:
@@ -575,7 +596,7 @@ class VistaUsuarios(ctk.CTkFrame):
             usuario
         )
 
-        if guardado:
+        if guardado is True:
             self.refrescar()
             self.limpiar()
             self.mostrar_mensaje("Usuario registrado correctamente.")
@@ -583,6 +604,54 @@ class VistaUsuarios(ctk.CTkFrame):
         elif guardado is False:
             self.mostrar_error(
                 "No se pudo registrar el usuario. Revisa los datos e inténtalo de nuevo."
+            )
+
+    def _al_actualizar(self):
+
+        if not self._hay_controlador():
+            return
+
+        # Comprobamos que exista un usuario seleccionado.
+        if self.id_actual is None:
+            self.mostrar_error(
+                "Selecciona un usuario de la tabla o búscalo por documento antes de actualizar."
+            )
+            return
+
+        try:
+            datos = self.obtener_datos()
+
+            usuario = Usuario(
+                nombre=datos["nombre"],
+                apellido=datos["apellido"],
+                documento=datos["documento"],
+                telefono=datos["telefono"],
+                correo=datos["correo"]
+            )
+
+        except (ValueError, TypeError) as error:
+            self.mostrar_error(str(error))
+            return
+
+        if not self.confirmar(
+            f"¿Actualizar los datos del usuario con ID {self.id_actual}?"
+        ):
+            return
+
+        resultado = self._llamar(
+            self.controlador_usuarios.actualizar,
+            usuario,
+            self.id_actual
+        )
+
+        if resultado is True:
+            self.refrescar()
+            self.limpiar()
+            self.mostrar_mensaje("Usuario actualizado correctamente.")
+
+        elif resultado is False:
+            self.mostrar_error(
+                "No se pudo actualizar el usuario."
             )
 
     def _al_eliminar(self):
@@ -739,20 +808,10 @@ if __name__ == "__main__":
         from datos.gestor_sql import GestorSQL
         from servicios.service import Service
 
-        gestor = GestorSQL()
-        servicio = Service(gestor)
+        servicio = Service(GestorSQL())
 
         vista.conectar(
             ControladorUsuarios(servicio)
-        )
-
-        def cerrar_aplicacion():
-            gestor.cerrar()
-            ventana.destroy()
-
-        ventana.protocol(
-            "WM_DELETE_WINDOW",
-            cerrar_aplicacion
         )
 
     else:

@@ -20,6 +20,7 @@ class VistaEditoriales(ctk.CTkFrame):
 
     Utiliza ControladorEditoriales:
       - guardar
+      - actualizar
       - eliminar
       - obtener_uno
       - obtener_todo
@@ -35,6 +36,7 @@ class VistaEditoriales(ctk.CTkFrame):
 
         self.controlador_editoriales = controlador_editoriales
         self.campos = {}
+        self.id_actual = None
 
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
@@ -198,11 +200,19 @@ class VistaEditoriales(ctk.CTkFrame):
 
         self._nuevo_boton(
             botones,
+            "Actualizar",
+            estilos.COLOR_BOTON_PRINCIPAL,
+            estilos.COLOR_BOTON_PRINCIPAL_HOVER,
+            self._al_actualizar,
+        ).grid(row=0, column=1, padx=4)
+
+        self._nuevo_boton(
+            botones,
             "Eliminar",
             estilos.COLOR_BOTON_PELIGRO,
             estilos.COLOR_BOTON_PELIGRO_HOVER,
             self._al_eliminar,
-        ).grid(row=0, column=1, padx=4)
+        ).grid(row=1, column=0, padx=4, pady=6)
 
         self._nuevo_boton(
             botones,
@@ -210,7 +220,7 @@ class VistaEditoriales(ctk.CTkFrame):
             estilos.COLOR_BOTON_SECUNDARIO,
             estilos.COLOR_BOTON_SECUNDARIO_HOVER,
             self.limpiar,
-        ).grid(row=1, column=0, padx=4, pady=6)
+        ).grid(row=1, column=1, padx=4, pady=6)
 
     def _crear_tabla(self):
         """Tabla Treeview con las editoriales registradas."""
@@ -429,6 +439,8 @@ class VistaEditoriales(ctk.CTkFrame):
 
         self._vaciar_campos()
 
+        self.id_actual = editorial.get("IdEditorial")
+
         self._escribir(
             self.campos["nombre"],
             editorial.get("Nombre", "")
@@ -438,6 +450,7 @@ class VistaEditoriales(ctk.CTkFrame):
         """Vacía el formulario y quita la selección de la tabla."""
 
         self._vaciar_campos()
+        self.id_actual = None
 
         self.entrada_buscar.delete(0, tk.END)
 
@@ -463,6 +476,13 @@ class VistaEditoriales(ctk.CTkFrame):
         if not self._hay_controlador():
             return
 
+        if self.id_actual is not None:
+            self.mostrar_error(
+                "Hay una editorial seleccionada. "
+                "Usa Actualizar o Limpiar antes de registrar otra."
+            )
+            return
+
         try:
             editorial = Editorial.desde_formulario(
                 self.obtener_datos()
@@ -486,6 +506,48 @@ class VistaEditoriales(ctk.CTkFrame):
             self.mostrar_error(
                 "No se pudo guardar la editorial. "
                 "Revisa los datos e inténtalo de nuevo."
+            )
+
+    def _al_actualizar(self):
+        """Actualiza la editorial seleccionada."""
+
+        if not self._hay_controlador():
+            return
+
+        if self.id_actual is None:
+            self.mostrar_error(
+                "Selecciona una editorial de la tabla antes de actualizar."
+            )
+            return
+
+        try:
+            editorial = Editorial.desde_formulario(
+                self.obtener_datos()
+            )
+
+        except ValueError as error:
+            self.mostrar_error(str(error))
+            return
+
+        if not self.confirmar(
+            f"¿Actualizar la editorial con ID {self.id_actual}?"
+        ):
+            return
+
+        resultado = self._llamar(
+            self.controlador_editoriales.actualizar,
+            editorial,
+            self.id_actual
+        )
+
+        if resultado is True:
+            self.refrescar()
+            self.limpiar()
+            self.mostrar_mensaje("Editorial actualizada correctamente.")
+
+        elif resultado is False:
+            self.mostrar_error(
+                "No se pudo actualizar la editorial."
             )
 
     def _al_eliminar(self):

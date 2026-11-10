@@ -31,6 +31,12 @@ class Editorial:
             # En la BD la columna se llama "Ideditorial" (con e minúscula)
             id_editorial=validaciones.columna(fila, "Ideditorial", "IdEditorial"),
         )
+        
+    @classmethod
+    def desde_formulario(cls, datos):
+        return cls(
+            nombre=validaciones.columna(datos, "Nombre")
+        )
 
     def a_diccionario(self):
         return {"IdEditorial": self.id_editorial, "Nombre": self.nombre}

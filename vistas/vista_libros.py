@@ -45,6 +45,7 @@ class VistaLibros(ctk.CTkFrame):
         self._editoriales = {}
 
         self.campos = {}  # Aquí se guardan las cajas del formulario
+        self.id_actual = None  # ISBN del libro que se está editando
 
         # La columna 1 (la tabla) crece si se agranda la ventana
         self.grid_columnconfigure(0, weight=0)
@@ -73,7 +74,7 @@ class VistaLibros(ctk.CTkFrame):
         if RUTA_LOGO.exists():
             imagen = Image.open(RUTA_LOGO)
             alto = 90
-            ancho = round(imagen.width * alto / imagen.height)  # se mantiene la proporción
+            ancho = round(imagen.width * alto / imagen.height)
             self._logo = ctk.CTkImage(light_image=imagen, size=(ancho, alto))
             ctk.CTkLabel(encabezado, image=self._logo, text="").pack(side="left", padx=(20, 15))
 
@@ -99,7 +100,6 @@ class VistaLibros(ctk.CTkFrame):
 
         self.entrada_buscar = self._nueva_caja(barra, ancho=170)
         self.entrada_buscar.pack(side="left", pady=10)
-        # Presionar Enter en la caja también busca
         self.entrada_buscar.bind("<Return>", lambda evento: self._al_buscar())
 
         ctk.CTkButton(
@@ -149,27 +149,30 @@ class VistaLibros(ctk.CTkFrame):
         self._nuevo_boton(
             botones, "Guardar", estilos.COLOR_BOTON_PRINCIPAL,
             estilos.COLOR_BOTON_PRINCIPAL_HOVER, self._al_guardar,
-        ).grid(row=0, column=0, padx=5)
+        ).grid(row=0, column=0, padx=5, pady=5)
+
+        self._nuevo_boton(
+            botones, "Actualizar", estilos.COLOR_BOTON_PRINCIPAL,
+            estilos.COLOR_BOTON_PRINCIPAL_HOVER, self._al_actualizar,
+        ).grid(row=0, column=1, padx=5, pady=5)
 
         self._nuevo_boton(
             botones, "Eliminar", estilos.COLOR_BOTON_PELIGRO,
             estilos.COLOR_BOTON_PELIGRO_HOVER, self._al_eliminar,
-        ).grid(row=0, column=1, padx=5)
+        ).grid(row=1, column=0, padx=5, pady=5)
 
         self._nuevo_boton(
             botones, "Limpiar", estilos.COLOR_BOTON_SECUNDARIO,
             estilos.COLOR_BOTON_SECUNDARIO_HOVER, self.limpiar,
-        ).grid(row=0, column=2, padx=5)
+        ).grid(row=1, column=1, padx=5, pady=5)
 
     def _crear_tabla(self):
         """Tabla (Treeview) con los libros registrados."""
         contenedor = ctk.CTkFrame(self, fg_color=estilos.COLOR_PANEL, corner_radius=estilos.RADIO_BORDE)
         contenedor.grid(row=1, column=1, sticky="nsew", padx=(10, 20), pady=(0, 20))
 
-        # CustomTkinter no trae tabla, así que se usa el Treeview de tkinter
-        # y se le cambian los colores con un "Style".
         estilo = ttk.Style()
-        estilo.theme_use("clam")  # Este tema sí permite cambiar el color de los encabezados
+        estilo.theme_use("clam")
         estilo.configure(
             "Libros.Treeview",
             background=estilos.COLOR_TABLA_FONDO,
@@ -182,7 +185,6 @@ class VistaLibros(ctk.CTkFrame):
             lightcolor=estilos.COLOR_PANEL,
             darkcolor=estilos.COLOR_PANEL,
         )
-        # Quita el marco gris que el tema "clam" le pone a la tabla
         estilo.layout("Libros.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
         estilo.configure(
             "Libros.Treeview.Heading",
@@ -209,7 +211,6 @@ class VistaLibros(ctk.CTkFrame):
             self.tabla.heading(clave, text=encabezado)
             self.tabla.column(clave, width=ancho, minwidth=40, anchor="center", stretch=True)
 
-        # Filas de dos tonos (tipo cebra) para que se lea más fácil
         self.tabla.tag_configure("par", background=estilos.COLOR_TABLA_FONDO)
         self.tabla.tag_configure("impar", background=estilos.COLOR_PANEL)
 
@@ -224,7 +225,6 @@ class VistaLibros(ctk.CTkFrame):
         barra_scroll.pack(side="right", fill="y", padx=(0, 8), pady=12)
         self.tabla.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=12)
 
-        # Al hacer clic en una fila, sus datos pasan al formulario
         self.tabla.bind("<<TreeviewSelect>>", self._al_seleccionar_fila)
 
     # ---------- Pequeñas "fábricas" para no repetir código ----------
@@ -245,7 +245,7 @@ class VistaLibros(ctk.CTkFrame):
         lista = ctk.CTkComboBox(
             padre,
             values=[],
-            state="readonly",  # El usuario escoge, no escribe
+            state="readonly",
             width=estilos.ANCHO_CAMPO,
             height=estilos.ALTO_CAMPO,
             corner_radius=estilos.RADIO_BORDE,
@@ -294,13 +294,10 @@ class VistaLibros(ctk.CTkFrame):
         editoriales = self._llamar(self.controlador_editoriales.obtener_todo) or []
         libros = self._llamar(self.controlador_libros.obtener_todo) or []
 
-        # Los controladores devuelven objetos (Autor, Editorial, Libro).
-        # a_opcion() los convierte en la tupla (id, nombre) que usan las listas.
         opciones_autores = [autor.a_opcion() for autor in autores]
         opciones_editoriales = [editorial.a_opcion() for editorial in editoriales]
         self.cargar_listas(opciones_autores, opciones_editoriales)
 
-        # La tabla Libros solo guarda los Id; aquí se buscan los nombres para mostrarlos
         nombre_autor = dict(opciones_autores)
         nombre_editorial = dict(opciones_editoriales)
         filas = []
@@ -316,28 +313,20 @@ class VistaLibros(ctk.CTkFrame):
     # =====================================================
 
     def cargar_listas(self, autores, editoriales):
-        """
-        Llena las listas desplegables.
-        autores y editoriales son listas de tuplas (id, nombre).
-        Ejemplo: [(1, "Gabriel García Márquez"), (2, "Julio Cortázar")]
-        """
+        """Llena las listas desplegables con tuplas (id, nombre)."""
         self._autores = {f"{id_} - {nombre}": id_ for id_, nombre in autores}
         self._editoriales = {f"{id_} - {nombre}": id_ for id_, nombre in editoriales}
         self.campos["autor"].configure(values=list(self._autores.keys()))
         self.campos["editorial"].configure(values=list(self._editoriales.keys()))
 
     def cargar_tabla(self, libros):
-        """
-        Muestra los libros en la tabla.
-        libros es una lista de diccionarios con las claves de COLUMNAS.
-        """
+        """Muestra los libros en la tabla."""
         for fila in self.tabla.get_children():
             self.tabla.delete(fila)
 
         for numero, libro in enumerate(libros):
             valores = [libro.get(clave, "") for clave, _, _ in self.COLUMNAS]
             tono = "par" if numero % 2 == 0 else "impar"
-            # iid=ISBN: así la fila se identifica por su ISBN (texto), no por un número
             self.tabla.insert("", tk.END, iid=str(libro["ISBN"]), values=valores, tags=(tono,))
 
     def obtener_datos(self):
@@ -353,8 +342,11 @@ class VistaLibros(ctk.CTkFrame):
         }
 
     def llenar_formulario(self, libro):
-        """Pone los datos de un libro en el formulario (por ejemplo al buscar)."""
+        """Pone los datos de un libro en el formulario."""
         self._vaciar_campos()
+
+        self.id_actual = libro.get("ISBN")
+
         self._escribir(self.campos["isbn"], libro.get("ISBN", ""))
         self._escribir(self.campos["titulo"], libro.get("Titulo", ""))
         self._escribir(self.campos["categoria"], libro.get("Categoria", ""))
@@ -366,8 +358,9 @@ class VistaLibros(ctk.CTkFrame):
         )
 
     def limpiar(self):
-        """Deja el formulario vacío y quita la selección de la tabla (botón Limpiar)."""
+        """Deja el formulario vacío y quita la selección de la tabla."""
         self._vaciar_campos()
+        self.id_actual = None
         self.entrada_buscar.delete(0, tk.END)
         if self.tabla.selection():
             self.tabla.selection_remove(self.tabla.selection())
@@ -382,47 +375,82 @@ class VistaLibros(ctk.CTkFrame):
         return messagebox.askyesno("Confirmar", texto)
 
     # =====================================================
-    # EVENTOS (lo que pasa al presionar botones)
+    # EVENTOS
     # =====================================================
 
     def _al_guardar(self):
         if not self._hay_controlador():
             return
 
-        # 1) El modelo Libro valida los datos (campos obligatorios, números, ISBN...)
+        # No se permite guardar si ya hay un libro seleccionado.
+        if self.id_actual is not None:
+            self.mostrar_error("Hay un libro seleccionado. Usa Actualizar o Limpiar antes de registrar otro.")
+            return
+
         try:
             libro = Libro.desde_formulario(self.obtener_datos())
         except ValueError as error:
             self.mostrar_error(str(error))
             return
 
-        # 2) Si el ISBN ya existe se ACTUALIZA; si no, se REGISTRA uno nuevo
+        # Guardar solo registra libros nuevos.
         existente = self._llamar(self.controlador_libros.obtener_uno, "ISBN", libro.isbn)
         if existente is not None:
-            if not self.confirmar(f"Ya existe un libro con ISBN {libro.isbn}. ¿Actualizar sus datos?"):
-                return
-            guardado = self._llamar(self.controlador_libros.actualizar, libro, libro.isbn)
-        else:
-            guardado = self._llamar(self.controlador_libros.guardar, libro)
+            self.mostrar_error(f"Ya existe un libro con ISBN {libro.isbn}. Usa Actualizar si deseas modificarlo.")
+            return
 
-        # 3) Se informa el resultado
-        if guardado:
+        guardado = self._llamar(self.controlador_libros.guardar, libro)
+
+        if guardado is True:
             self.refrescar()
             self.limpiar()
             self.mostrar_mensaje("Libro guardado correctamente.")
         elif guardado is False:
             self.mostrar_error("No se pudo guardar el libro. Revisa los datos e inténtalo de nuevo.")
 
+    def _al_actualizar(self):
+        if not self._hay_controlador():
+            return
+
+        if self.id_actual is None:
+            self.mostrar_error("Selecciona un libro de la tabla o búscalo por ISBN antes de actualizar.")
+            return
+
+        try:
+            libro = Libro.desde_formulario(self.obtener_datos())
+        except ValueError as error:
+            self.mostrar_error(str(error))
+            return
+
+        if not self.confirmar(f"¿Actualizar los datos del libro con ISBN {self.id_actual}?"):
+            return
+
+        resultado = self._llamar(
+            self.controlador_libros.actualizar,
+            libro,
+            self.id_actual,
+        )
+
+        if resultado is True:
+            self.refrescar()
+            self.limpiar()
+            self.mostrar_mensaje("Libro actualizado correctamente.")
+        elif resultado is False:
+            self.mostrar_error("No se pudo actualizar el libro.")
+
     def _al_eliminar(self):
         if not self._hay_controlador():
             return
+
         isbn = self.campos["isbn"].get().strip().replace("-", "")
         if not isbn:
             self.mostrar_error("Selecciona un libro de la tabla o escribe su ISBN.")
             return
+
         if self._llamar(self.controlador_libros.obtener_uno, "ISBN", isbn) is None:
             self.mostrar_error(f"No existe un libro con ISBN {isbn}.")
             return
+
         if not self.confirmar(f"¿Eliminar el libro con ISBN {isbn}?"):
             return
 
@@ -431,29 +459,32 @@ class VistaLibros(ctk.CTkFrame):
             self.limpiar()
             self.mostrar_mensaje("Libro eliminado.")
         else:
-            # Lo más común: el libro tiene préstamos y la clave foránea no deja borrarlo
             self.mostrar_error("No se pudo eliminar el libro. Puede que tenga préstamos registrados.")
 
     def _al_buscar(self):
         if not self._hay_controlador():
             return
+
         isbn = self.entrada_buscar.get().strip().replace("-", "")
         if not isbn:
             self.mostrar_error("Escribe un ISBN para buscar.")
             return
+
         libro = self._llamar(self.controlador_libros.obtener_uno, "ISBN", isbn)
         if libro is None:
             self.mostrar_error(f"No existe un libro con ISBN {isbn}.")
             return
+
         self.llenar_formulario(libro.a_diccionario())
 
     def _al_seleccionar_fila(self, evento):
         seleccion = self.tabla.selection()
         if not seleccion:
             return
+
         valores = self.tabla.item(seleccion[0], "values")
         libro = {clave: valores[i] for i, (clave, _, _) in enumerate(self.COLUMNAS)}
-        libro["ISBN"] = seleccion[0]  # El iid guarda el ISBN como texto exacto
+        libro["ISBN"] = seleccion[0]
         self.llenar_formulario(libro)
 
     # ---------- Ayudantes internos ----------
@@ -516,7 +547,6 @@ if __name__ == "__main__":
     vista.pack(fill="both", expand=True)
 
     if RUTA_BD.exists():
-        # Misma conexión entre capas que usa main.py: gestor -> servicio -> controladores
         from controladores.controladores import ControladorAutores, ControladorEditoriales, ControladorLibros
         from datos.gestor_sql import GestorSQL
         from servicios.service import Service
@@ -528,7 +558,6 @@ if __name__ == "__main__":
             ControladorEditoriales(servicio),
         )
     else:
-        # No se crea una base vacía: se avisa y la ventana se abre sin datos
         print(f"Aviso: no existe {RUTA_BD}. Crea la base desde database/schema_y_datos.sql.")
 
     ventana.mainloop()

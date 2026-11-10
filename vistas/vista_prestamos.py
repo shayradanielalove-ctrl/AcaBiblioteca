@@ -163,7 +163,7 @@ class VistaPrestamo(ctk.CTkFrame):
         self._nuevo_boton(
             barra,
             "Buscar",
-            estilos.COLOR_BOTON_BUSCAR,
+            estilos.COLOR_BOTON_BUSCAR_HOVER,
             estilos.COLOR_BOTON_BUSCAR_HOVER,
             self._al_buscar
         ).pack(side="left", padx=8, pady=10)

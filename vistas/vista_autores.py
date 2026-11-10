@@ -230,7 +230,15 @@ class VistaAutores(ctk.CTkFrame):
             estilos.COLOR_BOTON_PRINCIPAL,
             estilos.COLOR_BOTON_PRINCIPAL_HOVER,
             self._al_guardar
-        ).grid(row=0, column=0, padx=5)
+        ).grid(row=0, column=0, padx=4)
+
+        self._nuevo_boton(
+            botones,
+            "Actualizar",
+            estilos.COLOR_BOTON_PRINCIPAL,
+            estilos.COLOR_BOTON_PRINCIPAL_HOVER,
+            self._al_actualizar
+        ).grid(row=0, column=1, padx=4)
 
         self._nuevo_boton(
             botones,
@@ -238,7 +246,7 @@ class VistaAutores(ctk.CTkFrame):
             estilos.COLOR_BOTON_PELIGRO,
             estilos.COLOR_BOTON_PELIGRO_HOVER,
             self._al_eliminar
-        ).grid(row=0, column=1, padx=5)
+        ).grid(row=1, column=0, padx=4, pady=6)
 
         self._nuevo_boton(
             botones,
@@ -246,7 +254,7 @@ class VistaAutores(ctk.CTkFrame):
             estilos.COLOR_BOTON_SECUNDARIO,
             estilos.COLOR_BOTON_SECUNDARIO_HOVER,
             self.limpiar
-        ).grid(row=0, column=2, padx=5)
+        ).grid(row=1, column=1, padx=4, pady=6)
 
     def _crear_tabla(self):
         """Tabla Treeview con los autores registrados."""
@@ -404,7 +412,7 @@ class VistaAutores(ctk.CTkFrame):
         return ctk.CTkButton(
             padre,
             text=texto,
-            width=100,
+            width=85,
             height=36,
             corner_radius=estilos.RADIO_BORDE,
             font=estilos.FUENTE_BOTON,
@@ -518,8 +526,16 @@ class VistaAutores(ctk.CTkFrame):
     # =====================================================
 
     def _al_guardar(self):
+        """Registra un autor nuevo."""
 
         if not self._hay_controlador():
+            return
+
+        if self.id_actual is not None:
+            self.mostrar_error(
+                "Hay un autor seleccionado. "
+                "Usa Actualizar o Limpiar antes de registrar otro."
+            )
             return
 
         try:
@@ -534,34 +550,65 @@ class VistaAutores(ctk.CTkFrame):
             self.mostrar_error(str(error))
             return
 
-        # Si se seleccionó un autor, se actualiza.
-        if self.id_actual is not None:
+        guardado = self._llamar(
+            self.controlador_autores.guardar,
+            autor
+        )
 
-            guardado = self._llamar(
-                self.controlador_autores.actualizar,
-                autor,
-                self.id_actual
-            )
-
-            mensaje = "Autor actualizado correctamente."
-
-        else:
-
-            guardado = self._llamar(
-                self.controlador_autores.guardar,
-                autor
-            )
-
-            mensaje = "Autor registrado correctamente."
-
-        if guardado:
+        if guardado is True:
             self.refrescar()
             self.limpiar()
-            self.mostrar_mensaje(mensaje)
+            self.mostrar_mensaje("Autor registrado correctamente.")
 
         elif guardado is False:
             self.mostrar_error(
-                "No se pudo guardar el autor. Revisa los datos e inténtalo de nuevo."
+                "No se pudo guardar el autor. "
+                "Revisa los datos e inténtalo de nuevo."
+            )
+
+    def _al_actualizar(self):
+        """Actualiza el autor seleccionado."""
+
+        if not self._hay_controlador():
+            return
+
+        if self.id_actual is None:
+            self.mostrar_error(
+                "Selecciona un autor de la tabla o búscalo por su ID antes de actualizar."
+            )
+            return
+
+        try:
+            datos = self.obtener_datos()
+
+            autor = Autor(
+                nombre=datos["nombre"],
+                apellido=datos["apellido"]
+            )
+
+        except (ValueError, TypeError) as error:
+            self.mostrar_error(str(error))
+            return
+
+        if not self.confirmar(
+            f"¿Actualizar el autor con ID {self.id_actual}?"
+        ):
+            return
+
+        resultado = self._llamar(
+            self.controlador_autores.actualizar,
+            autor,
+            self.id_actual
+        )
+
+        if resultado is True:
+            self.refrescar()
+            self.limpiar()
+            self.mostrar_mensaje("Autor actualizado correctamente.")
+
+        elif resultado is False:
+            self.mostrar_error(
+                "No se pudo actualizar el autor."
             )
 
     def _al_eliminar(self):
@@ -633,6 +680,10 @@ class VistaAutores(ctk.CTkFrame):
             return
 
         self.llenar_formulario(autor)
+
+        if self.tabla.exists(str(codigo)):
+            self.tabla.selection_set(str(codigo))
+            self.tabla.see(str(codigo))
 
     def _al_seleccionar_fila(self, evento):
 
